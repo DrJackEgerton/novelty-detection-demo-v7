@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Novelty Detection Hub</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-image: url("AI_DeepDive.png");
+      background-size: cover;
+      background-position: center;
+      color: #fff;
+      text-shadow: 0 0 5px black;
+      padding: 2em;
+    }
+    .container {
+      background-color: rgba(0,0,0,0.6);
+      padding: 2em;
+      border-radius: 12px;
+      max-width: 900px;
+      margin: auto;
+    }
+    h1, h2 {
+      text-align: center;
+    }
+    textarea, input, button {
+      display: block;
+      margin: 1em auto;
+      width: 90%;
+      max-width: 600px;
+    }
+    input[type="file"] {
+      color: white;
+    }
+    pre {
+      background-color: rgba(255,255,255,0.1);
+      padding: 1em;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Novelty Detection Hub</h1>
+
+    <!-- TEXT DETECTOR -->
+    <h2>Text Novelty Detector</h2>
+    <textarea id="textInput" rows="6" placeholder="Enter your idea or text here..."></textarea>
+    <button onclick="analyzeText()">Check Novelty</button>
+    <pre id="textResult"></pre>
+
+    <!-- CSV DETECTOR -->
+    <h2>Waveform Novelty Detector (CSV)</h2>
+    <input type="file" id="csvInput" accept=".csv"/>
+    <button onclick="analyzeCSV()">Analyze CSV</button>
+    <pre id="csvResult"></pre>
+
+    <!-- IMAGE DETECTOR -->
+    <h2>Image Novelty Detector</h2>
+    <input type="file" id="imgInput" accept="image/*" />
+    <button onclick="analyzeImage()">Analyze Image</button>
+    <pre id="imgResult"></pre>
+  </div>
+
+  <script>
+    function analyzeText() {
+      const text = document.getElementById('textInput').value;
+      const result = document.getElementById('textResult');
+
+      if (text.length < 20) {
+        result.textContent = "Input too short for meaningful novelty analysis.";
+        return;
+      }
+
+      const rareWords = text.match(/\b[a-zA-Z]{7,}\b/g) || [];
+      const longWordScore = rareWords.length;
+      const uniquenessScore = (new Set(rareWords)).size;
+
+      result.textContent =
+        `Novelty Score: ${uniquenessScore}\nLong Words Detected: ${rareWords.join(", ")}`;
+    }
+
+    function analyzeCSV() {
+      const file = document.getElementById('csvInput').files[0];
+      const result = document.getElementById('csvResult');
+      if (!file) return result.textContent = "Please upload a CSV file.";
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const lines = reader.result.split('\n');
+        const numbers = lines.flatMap(line => line.split(',').map(x => parseFloat(x)).filter(x => !isNaN(x)));
+
+        if (numbers.length < 10) return result.textContent = "Not enough data to analyze.";
+
+        const mean = numbers.reduce((a,b) => a+b, 0) / numbers.length;
+        const variance = numbers.reduce((a,b) => a + Math.pow(b - mean, 2), 0) / numbers.length;
+        const stddev = Math.sqrt(variance);
+
+        result.textContent =
+          `Mean: ${mean.toFixed(2)}\nStandard Deviation: ${stddev.toFixed(2)}\nSignal Complexity: ${(stddev > 1 ? 'High' : 'Low')}`;
+      };
+      reader.readAsText(file);
+    }
+
+    function analyzeImage() {
+      const file = document.getElementById('imgInput').files[0];
+      const result = document.getElementById('imgResult');
+      if (!file) return result.textContent = "Please upload an image file.";
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+
+          const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+          let brightness = 0;
+          let edges = 0;
+
+          // Calculate brightness
+          for (let i = 0; i < data.length; i += 4) {
+            brightness += 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+          }
+          brightness = brightness / (data.length / 4);
+
+          // Simple edge detection using Sobel filter (basic example)
+          for (let i = 0; i < data.length; i += 4) {
+            const px = data[i] + data[i+1] + data[i+2]; // simple RGB sum
+            if (px > 200) { // arbitrary threshold for edge-like patterns
+              edges++;
+            }
+          }
+
+          // Set complexity based on brightness and edge count
+          const textureDetection = edges > 500 ? 'High Texture' : 'Low Texture';
+          result.textContent = `Average Brightness: ${brightness.toFixed(2)}\nVisual Complexity: ${brightness > 100 ? 'Bright & Detailed' : 'Dark or Simple'}\nPattern/Texture Detection: ${textureDetection}`;
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  </script>
+</body>
+</html>
